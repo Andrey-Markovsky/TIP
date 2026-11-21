@@ -7,6 +7,8 @@ import {
   addTask, setTaskCompleted, renameTask, removeTask,
 } from "./src/task-service.js";
 
+import { searchTasks } from "./src/task-extra.js";
+
 let passed = 0;
 let failed = 0;
 
@@ -354,6 +356,48 @@ check("35. Работа с другим набором, без зависимо�
 //   const result = ...;
 //   assert.deepEqual(result, ...);
 // });
+check("36. Собственная проверка 1: добавление задачи с ранее удалённым id", () => {
+  const initial = fixture();
+  const afterRemove = expectTasks(removeTask(initial, 7));
+  const afterAdd = expectTasks(addTask(afterRemove, 7, "Повторно созданная задача", "high"));
+  assert.deepEqual(afterAdd.map((task) => task.id), [1, 4, 10, 7]);
+  assert.equal(afterAdd[3].title, "Повторно созданная задача");
+  assert.equal(afterAdd[3].priority, "high");
+  assert.deepEqual(initial, fixture());
+});
+
+check("37. Собственная проверка 2: последовательное изменение первой и последней записи", () => {
+  const initial = fixture();
+  const step1 = expectTasks(setTaskCompleted(initial, 1, false));
+  const step2 = expectTasks(renameTask(step1, 10, "Обновить итоговый отчёт"));
+  assert.equal(step2[0].completed, false);
+  assert.equal(step2[3].title, "Обновить итоговый отчёт");
+  assert.deepEqual(getTaskStats(step2), { total: 4, completed: 1, pending: 3, progress: 25 });
+  assert.deepEqual(initial, fixture());
+});
+
+check("38. Собственная проверка 3: цепочка создания, переименования и выполнения сохраняет priority", () => {
+  const initial = [];
+  const step1 = expectTasks(addTask(initial, 50, "Черновая задача", "low"));
+  const step2 = expectTasks(renameTask(step1, 50, "Финальная задача"));
+  const step3 = expectTasks(setTaskCompleted(step2, 50, true));
+  assert.deepEqual(step3, [{ id: 50, title: "Финальная задача", completed: true, priority: "low" }]);
+  assert.equal(step1[0].title, "Черновая задача");
+  assert.equal(step2[0].completed, false);
+  assert.deepEqual(initial, []);
+});
+
+check("39. Расширение searchTasks: регистр, пробелы, пустой запрос и неизменность", () => {
+  const tasks = Object.freeze(fixture().map((task) => Object.freeze(task)));
+  assert.deepEqual(searchTasks(tasks, " ФУНК ").map((task) => task.id), [1]);
+  assert.deepEqual(searchTasks(tasks, "методы").map((task) => task.id), [7]);
+  assert.deepEqual(searchTasks(tasks, "несуществующий фрагмент"), []);
+  const allCopy = searchTasks(tasks, "   ");
+  assert.deepEqual(allCopy, tasks);
+  assert.notEqual(allCopy, tasks);
+  assert.deepEqual(searchTasks([], "задача"), []);
+  assert.deepEqual(tasks, fixture());
+});
 
 console.log(`\nПроверок пройдено: ${passed}; не пройдено: ${failed}.`);
 if (failed > 0) {
